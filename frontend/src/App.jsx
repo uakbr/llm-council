@@ -4,6 +4,32 @@ import ChatInterface from './components/ChatInterface';
 import { api } from './api';
 import './App.css';
 
+export function appendConversationMessages(conversation, newMessages) {
+  if (!conversation) return conversation;
+  const existing = Array.isArray(conversation.messages) ? conversation.messages : [];
+  return {
+    ...conversation,
+    messages: [...existing, ...newMessages],
+  };
+}
+
+export function updateLatestAssistant(conversation, conversationId, updateFn) {
+  if (!conversation || conversation.id !== conversationId) return conversation;
+  const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+  if (messages.length === 0) return conversation;
+
+  const lastIndex = messages.length - 1;
+  const lastMsg = messages[lastIndex];
+  const nextMsg = updateFn({
+    ...lastMsg,
+    loading: { ...(lastMsg.loading || {}) },
+  }) || lastMsg;
+
+  const nextMessages = [...messages];
+  nextMessages[lastIndex] = nextMsg;
+  return { ...conversation, messages: nextMessages };
+}
+
 function App() {
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
@@ -58,18 +84,12 @@ function App() {
   };
 
   const handleSendMessage = async (content) => {
-    if (!currentConversationId) return;
+    if (!currentConversationId || !currentConversation) return;
 
+    const streamConversationId = currentConversationId;
     setIsLoading(true);
     try {
-      // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
-      setCurrentConversation((prev) => ({
-        ...prev,
-        messages: [...prev.messages, userMessage],
-      }));
-
-      // Create a partial assistant message that will be updated progressively
       const assistantMessage = {
         role: 'assistant',
         stage1: null,
@@ -83,80 +103,76 @@ function App() {
         },
       };
 
-      // Add the partial assistant message
-      setCurrentConversation((prev) => ({
-        ...prev,
-        messages: [...prev.messages, assistantMessage],
-      }));
+      // Add user + assistant placeholder together
+      setCurrentConversation((prev) =>
+        appendConversationMessages(prev, [userMessage, assistantMessage])
+      );
 
-      // Send message with streaming
-      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+      await api.sendMessageStream(streamConversationId, content, (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage1 = true;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLatestAssistant(prev, streamConversationId, (msg) => ({
+                ...msg,
+                loading: { ...msg.loading, stage1: true },
+              }))
+            );
             break;
 
           case 'stage1_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage1 = event.data;
-              lastMsg.loading.stage1 = false;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLatestAssistant(prev, streamConversationId, (msg) => ({
+                ...msg,
+                stage1: event.data,
+                loading: { ...msg.loading, stage1: false },
+              }))
+            );
             break;
 
           case 'stage2_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage2 = true;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLatestAssistant(prev, streamConversationId, (msg) => ({
+                ...msg,
+                loading: { ...msg.loading, stage2: true },
+              }))
+            );
             break;
 
           case 'stage2_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage2 = event.data;
-              lastMsg.metadata = event.metadata;
-              lastMsg.loading.stage2 = false;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLatestAssistant(prev, streamConversationId, (msg) => ({
+                ...msg,
+                stage2: event.data,
+                metadata: event.metadata,
+                loading: { ...msg.loading, stage2: false },
+              }))
+            );
             break;
 
           case 'stage3_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage3 = true;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLatestAssistant(prev, streamConversationId, (msg) => ({
+                ...msg,
+                loading: { ...msg.loading, stage3: true },
+              }))
+            );
             break;
 
           case 'stage3_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage3 = event.data;
-              lastMsg.loading.stage3 = false;
-              return { ...prev, messages };
-            });
+            setCurrentConversation((prev) =>
+              updateLatestAssistant(prev, streamConversationId, (msg) => ({
+                ...msg,
+                stage3: event.data,
+                loading: { ...msg.loading, stage3: false },
+              }))
+            );
             break;
 
           case 'title_complete':
-            // Reload conversations to get updated title
             loadConversations();
             break;
 
           case 'complete':
-            // Stream complete, reload conversations list
             loadConversations();
             setIsLoading(false);
             break;
@@ -172,11 +188,10 @@ function App() {
       });
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Remove optimistic messages on error
-      setCurrentConversation((prev) => ({
-        ...prev,
-        messages: prev.messages.slice(0, -2),
-      }));
+      setCurrentConversation((prev) => {
+        if (!prev || !Array.isArray(prev.messages) || prev.messages.length < 2) return prev;
+        return { ...prev, messages: prev.messages.slice(0, -2) };
+      });
       setIsLoading(false);
     }
   };

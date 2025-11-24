@@ -8,7 +8,8 @@ from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
 async def query_model(
     model: str,
     messages: List[Dict[str, str]],
-    timeout: float = 120.0
+    timeout: float = 120.0,
+    client: Optional[httpx.AsyncClient] = None
 ) -> Optional[Dict[str, Any]]:
     """
     Query a single model via OpenRouter API.
@@ -32,8 +33,8 @@ async def query_model(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
+        async def _do_request(client_obj: httpx.AsyncClient):
+            response = await client_obj.post(
                 OPENROUTER_API_URL,
                 headers=headers,
                 json=payload
@@ -48,6 +49,12 @@ async def query_model(
                 'reasoning_details': message.get('reasoning_details')
             }
 
+        if client is not None:
+            return await _do_request(client)
+
+        async with httpx.AsyncClient(timeout=timeout) as client_obj:
+            return await _do_request(client_obj)
+
     except Exception as e:
         print(f"Error querying model {model}: {e}")
         return None
@@ -55,7 +62,8 @@ async def query_model(
 
 async def query_models_parallel(
     models: List[str],
-    messages: List[Dict[str, str]]
+    messages: List[Dict[str, str]],
+    timeout: float = 120.0
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """
     Query multiple models in parallel.
@@ -69,11 +77,8 @@ async def query_models_parallel(
     """
     import asyncio
 
-    # Create tasks for all models
-    tasks = [query_model(model, messages) for model in models]
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        tasks = [query_model(model, messages, timeout=timeout, client=client) for model in models]
+        responses = await asyncio.gather(*tasks)
 
-    # Wait for all to complete
-    responses = await asyncio.gather(*tasks)
-
-    # Map models to their responses
     return {model: response for model, response in zip(models, responses)}
