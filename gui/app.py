@@ -10,7 +10,13 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import QUrl
 from qasync import QEventLoop
 
+from .api import CouncilAPI
+from .bridge import QmlBridge
 from .config import APP_NAME, LOG_FILE, ensure_dirs
+from .controller import GUIController
+from .persistence import load_settings
+from .state import AppState
+from .stream import StreamRunner
 
 
 def setup_logging() -> None:
@@ -33,7 +39,15 @@ def main() -> int:
     asyncio.set_event_loop(loop)
     app.aboutToQuit.connect(loop.stop)
 
+    settings = load_settings()
+    state = AppState(settings.backend_url)
+    api = CouncilAPI(base_url=state.backend_url, api_key=settings.api_key)
+    controller = GUIController(api, state)
+    stream_runner = StreamRunner(api, state)
+    bridge = QmlBridge(controller, stream_runner, state)
+
     engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("bridge", bridge)
     qml_path = Path(__file__).parent / "ui" / "Main.qml"
     engine.load(QUrl.fromLocalFile(str(qml_path)))
 
@@ -46,6 +60,8 @@ def main() -> int:
     with loop:
         loop.run_forever()
 
+    # Ensure HTTP client closes cleanly even after loop teardown
+    asyncio.run(api.aclose())
     return 0
 
 

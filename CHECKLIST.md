@@ -10,10 +10,13 @@
 - Tooling installed: Homebrew python@3.11, uv CLI; env recreated via `uv venv`/`uv sync`; tests executed with `uv run pytest`.
 - Controller layer added to coordinate API/state and tested with async fakes.
 - Docs cleaned and consolidated: new `docs/ARCHITECTURE.md`, `docs/PLAN.md`; root README refreshed; removed redundant CLAUDE.md and outline.md.
+- AppState now tracks stage payloads (stage1/2/3, labels, titles) and keeps conversation titles in sync with streamed events.
+- QML bridge (`gui/bridge.py`) exposes state/controller/stream to the UI; Main.qml now binds to live conversations, streaming status, stage data, and send/stop actions.
+- Added bridge/state tests; full suite passes with ~92% coverage (`uv run pytest --cov=gui --cov-report=term-missing`).
 
 ## Doing
-- Connect GUI data layer to QML views; stream live stage events.
-- Harden streaming (cancel/retry) and settings UX.
+- Harden streaming UX: graceful cancel/retry, status toasts/errors, backend URL/API key surface in settings.
+- Add charts/visual polish for Stage 2 aggregate rankings.
 
 ## Next
 - Package desktop app (PyInstaller/briefcase) per target OS.

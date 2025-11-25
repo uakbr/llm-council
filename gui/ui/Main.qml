@@ -16,6 +16,19 @@ ApplicationWindow {
     property color panel: "#171a20"
     property color muted: "#9ca3af"
 
+    Component.onCompleted: bridge.loadConversations()
+
+    function stageComplete(key) {
+        if (key === "stage1") return bridge.stageData.stage1 && bridge.stageData.stage1.length > 0;
+        if (key === "stage2") return bridge.stageData.stage2 && bridge.stageData.stage2.length > 0;
+        if (key === "stage3") return bridge.stageData.stage3 !== null;
+        return false;
+    }
+
+    function stageActive(key) {
+        return bridge.streamStatus.inFlight && bridge.streamStatus.currentStage && bridge.streamStatus.currentStage.indexOf(key) === 0;
+    }
+
     Rectangle {
         anchors.fill: parent
         color: root.color
@@ -65,7 +78,7 @@ ApplicationWindow {
                     }
 
                     Label {
-                        text: "Desktop preview — wired for backend streaming next."
+                        text: "Backend: " + bridge.backendUrl
                         wrapMode: Label.Wrap
                         color: muted
                         font.pixelSize: 12
@@ -75,6 +88,7 @@ ApplicationWindow {
                         text: "New Conversation"
                         Layout.fillWidth: true
                         font.pixelSize: 14
+                        onClicked: bridge.newConversation()
                         background: Rectangle {
                             radius: 10
                             color: control.down ? Qt.darker(root.accent, 1.2) : root.accent
@@ -95,14 +109,11 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
-                        model: ListModel {
-                            ListElement { title: "Prompt comparison"; status: "Complete" }
-                            ListElement { title: "Research outline"; status: "Streaming" }
-                            ListElement { title: "Data viz ideas"; status: "Draft" }
-                        }
+                        model: bridge.conversations
                         delegate: Item {
                             width: convoList.width
-                            height: 52
+                            height: 64
+                            property var convo: modelData
                             Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: 6
@@ -117,13 +128,13 @@ ApplicationWindow {
                                         Layout.fillWidth: true
                                         spacing: 2
                                         Label {
-                                            text: title
+                                            text: convo.title || "Untitled"
                                             color: "white"
                                             font.pixelSize: 14
                                             elide: Label.ElideRight
                                         }
                                         Label {
-                                            text: status
+                                            text: convo.streaming ? "Streaming" : (convo.message_count + " message(s)")
                                             color: muted
                                             font.pixelSize: 11
                                         }
@@ -132,9 +143,16 @@ ApplicationWindow {
                                         width: 10
                                         height: 10
                                         radius: 5
-                                        color: status === "Streaming" ? accent : "#22c55e"
+                                        color: convo.streaming ? accent : "#22c55e"
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    convoList.currentIndex = index
+                                    bridge.selectConversation(convo.id)
                                 }
                             }
                         }
@@ -159,51 +177,71 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         spacing: 10
                         Label {
-                            text: "Conversation"
+                            text: bridge.currentConversation ? bridge.currentConversation.title : "Conversation"
                             color: "white"
                             font.pixelSize: 24
                             font.bold: true
                         }
                         Rectangle {
                             radius: 8
-                            color: Qt.rgba(0.12,0.6,0.9,0.18)
-                            border.color: Qt.rgba(0.12,0.6,0.9,0.45)
+                            color: bridge.streamStatus.inFlight ? Qt.rgba(0.12,0.6,0.9,0.18) : Qt.rgba(0.16,0.6,0.35,0.18)
+                            border.color: bridge.streamStatus.inFlight ? Qt.rgba(0.12,0.6,0.9,0.45) : Qt.rgba(0.22,0.8,0.6,0.45)
                             height: 30
-                            width: 120
+                            width: 160
                             anchors.verticalCenter: parent.verticalCenter
                             Row {
                                 anchors.centerIn: parent
                                 spacing: 6
                                 Rectangle {
-                                    width: 10; height: 10; radius: 5; color: accent
+                                    width: 10; height: 10; radius: 5; color: bridge.streamStatus.inFlight ? accent : "#22c55e"
                                     SequentialAnimation on opacity {
-                                        loops: Animation.Infinite
+                                        loops: bridge.streamStatus.inFlight ? Animation.Infinite : 1
                                         NumberAnimation { from: 0.35; to: 1.0; duration: 900; easing.type: Easing.InOutSine }
                                         NumberAnimation { from: 1.0; to: 0.35; duration: 900; easing.type: Easing.InOutSine }
                                     }
                                 }
-                                Label { text: "Idle"; color: accent; font.pixelSize: 12 }
+                                Label {
+                                    text: bridge.streamStatus.inFlight ? (bridge.streamStatus.currentStage || "Streaming") : "Idle"
+                                    color: bridge.streamStatus.inFlight ? accent : "#22c55e"
+                                    font.pixelSize: 12
+                                }
                             }
                         }
                         Item { Layout.fillWidth: true }
                         Button {
-                            text: "Settings"
+                            text: bridge.streamStatus.inFlight ? "Stop" : "Settings"
                             flat: true
-                            icon.name: "settings"
+                            icon.name: bridge.streamStatus.inFlight ? "media-playback-stop" : "settings"
                             contentItem: Label { text: control.text; color: "white" }
+                            onClicked: {
+                                if (bridge.streamStatus.inFlight) {
+                                    bridge.cancelStream()
+                                }
+                            }
                         }
                     }
 
                     Rectangle { Layout.fillWidth: true; height: 1; color: "#1f2933" }
 
-                    // Stage tabs placeholder
+                    // Stage tabs
                     RowLayout {
                         spacing: 10
-                        Label { text: "Stage 1 · Models"; color: muted; font.pixelSize: 13 }
-                        Rectangle { width: 6; height: 6; radius: 3; color: "#374151"; anchors.verticalCenter: parent.verticalCenter }
-                        Label { text: "Stage 2 · Rankings"; color: muted; font.pixelSize: 13 }
-                        Rectangle { width: 6; height: 6; radius: 3; color: "#374151"; anchors.verticalCenter: parent.verticalCenter }
-                        Label { text: "Stage 3 · Final"; color: muted; font.pixelSize: 13 }
+                        Repeater {
+                            model: [
+                                { key: "stage1", label: "Stage 1 · Models" },
+                                { key: "stage2", label: "Stage 2 · Rankings" },
+                                { key: "stage3", label: "Stage 3 · Final" }
+                            ]
+                            delegate: RowLayout {
+                                spacing: 6
+                                Rectangle {
+                                    width: 8; height: 8; radius: 4;
+                                    color: stageComplete(modelData.key) ? "#22c55e" : stageActive(modelData.key) ? accent : "#374151"
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Label { text: modelData.label; color: stageComplete(modelData.key) ? "white" : muted; font.pixelSize: 13 }
+                            }
+                        }
                     }
 
                     Rectangle {
@@ -216,73 +254,211 @@ ApplicationWindow {
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 16
-                            spacing: 12
+                            spacing: 16
 
-                            Label {
-                                text: "Streaming view is coming next. Backend events will paint model tabs, rankings, and the synthesized reply."
-                                wrapMode: Label.Wrap
-                                color: muted
-                                font.pixelSize: 14
-                            }
-
-                            Rectangle {
+                            // Stage 1 responses
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                height: 140
-                                radius: 12
-                                gradient: Gradient {
-                                    GradientStop { position: 0.0; color: Qt.rgba(0.11, 0.22, 0.35, 0.65) }
-                                    GradientStop { position: 1.0; color: Qt.rgba(0.08, 0.11, 0.18, 0.85) }
-                                }
-                                border.color: Qt.rgba(0.12,0.6,0.9,0.35)
-
-                                Column {
-                                    anchors.centerIn: parent
-                                    spacing: 8
-                                    Label { text: "Stage timeline"; color: "white"; font.pixelSize: 16; font.bold: true }
-                                    Label { text: "• Stage 1: per-model responses\n• Stage 2: anonymous peer rankings\n• Stage 3: chairman synthesis"; color: muted; font.pixelSize: 13 }
-                                }
-                            }
-
-                            Item { Layout.fillHeight: true }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 64
-                                radius: 12
-                                color: "#12151b"
-                                border.color: "#1f2933"
+                                spacing: 8
                                 RowLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 10
-
-                                    TextArea {
-                                        id: inputBox
+                                    spacing: 8
+                                    Label { text: "Stage 1 · Model Responses"; color: "white"; font.pixelSize: 16; font.bold: true }
+                                    Label { text: bridge.stageData.stage1.length ? "(" + bridge.stageData.stage1.length + ")" : ""; color: muted; font.pixelSize: 12 }
+                                }
+                                Repeater {
+                                    model: bridge.stageData.stage1
+                                    delegate: Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.fillHeight: true
-                                        placeholderText: "Ask the council anything..."
-                                        color: "white"
-                                        placeholderTextColor: "#6b7280"
-                                        wrapMode: TextEdit.Wrap
-                                        background: Rectangle {
-                                            radius: 10
-                                            color: "#0f1115"
-                                            border.color: "#1f2933"
+                                        height: implicitHeight
+                                        radius: 10
+                                        color: "#111620"
+                                        border.color: "#1f2933"
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 6
+                                            Label { text: modelData.model; color: accent; font.pixelSize: 13; font.bold: true }
+                                            Text {
+                                                text: modelData.response
+                                                wrapMode: Text.Wrap
+                                                color: "white"
+                                                font.pixelSize: 13
+                                            }
                                         }
-                                    }
-
-                                    Button {
-                                        text: "Send"
-                                        icon.name: "arrow-up"
-                                        width: 96
-                                        Layout.alignment: Qt.AlignVCenter
-                                        background: Rectangle {
-                                            radius: 12
-                                            color: control.down ? Qt.darker(root.accent, 1.2) : root.accent
-                                        }
-                                        contentItem: Label { text: control.text; color: "#0b1020"; font.bold: true }
                                     }
                                 }
+                                Label {
+                                    visible: bridge.stageData.stage1.length === 0
+                                    text: bridge.streamStatus.inFlight ? "Waiting for models…" : "No responses yet. Ask a question to start."
+                                    color: muted
+                                    font.pixelSize: 13
+                                }
+                            }
+
+                            Rectangle { Layout.fillWidth: true; height: 1; color: "#1f2933" }
+
+                            // Stage 2 rankings
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                RowLayout {
+                                    spacing: 8
+                                    Label { text: "Stage 2 · Peer Rankings"; color: "white"; font.pixelSize: 16; font.bold: true }
+                                    Label { text: bridge.stageData.stage2.length ? "(" + bridge.stageData.stage2.length + ")" : ""; color: muted; font.pixelSize: 12 }
+                                }
+                                Repeater {
+                                    model: bridge.stageData.stage2
+                                    delegate: Rectangle {
+                                        Layout.fillWidth: true
+                                        radius: 10
+                                        color: "#111620"
+                                        border.color: "#1f2933"
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 6
+                                            Label { text: modelData.model; color: accent; font.pixelSize: 13; font.bold: true }
+                                            Text {
+                                                text: modelData.ranking
+                                                wrapMode: Text.Wrap
+                                                color: "white"
+                                                font.pixelSize: 13
+                                            }
+                                            Label {
+                                                visible: modelData.parsed_ranking && modelData.parsed_ranking.length > 0
+                                                text: modelData.parsed_ranking ? modelData.parsed_ranking.join(" → ") : ""
+                                                color: muted
+                                                font.pixelSize: 12
+                                            }
+                                        }
+                                    }
+                                }
+                                Label {
+                                    visible: bridge.stageData.stage2.length === 0
+                                    text: bridge.streamStatus.inFlight ? "Waiting for peer rankings…" : "No rankings yet."
+                                    color: muted
+                                    font.pixelSize: 13
+                                }
+                                // Aggregate rankings
+                                Repeater {
+                                    model: bridge.stageData.aggregateRankings || []
+                                    delegate: Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 36
+                                        radius: 8
+                                        color: "#0f1118"
+                                        border.color: "#1f2933"
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 8
+                                            Label { text: "" + modelData.model; color: "white"; font.pixelSize: 12; Layout.preferredWidth: 120 }
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                height: 8
+                                                radius: 4
+                                                color: Qt.rgba(0.12, 0.6, 0.9, 0.35)
+                                                Rectangle {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.left: parent.left
+                                                    height: parent.height
+                                                    width: Math.max(12, (parent.width * (1.0 / (modelData.average_rank || 1))))
+                                                    radius: 4
+                                                    color: accent
+                                                }
+                                            }
+                                            Label { text: "avg " + (modelData.average_rank && modelData.average_rank.toFixed ? modelData.average_rank.toFixed(2) : modelData.average_rank); color: muted; font.pixelSize: 12 }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle { Layout.fillWidth: true; height: 1; color: "#1f2933" }
+
+                            // Stage 3 final
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                RowLayout {
+                                    spacing: 8
+                                    Label { text: "Stage 3 · Final Answer"; color: "white"; font.pixelSize: 16; font.bold: true }
+                                    Label { text: bridge.stageData.stage3 ? "ready" : ""; color: muted; font.pixelSize: 12 }
+                                }
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 10
+                                    color: "#111620"
+                                    border.color: "#1f2933"
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 12
+                                        spacing: 8
+                                        Label { text: bridge.stageData.stage3 ? bridge.stageData.stage3.model : ""; color: accent; font.pixelSize: 13; font.bold: true }
+                                        Text {
+                                            text: bridge.stageData.stage3 ? bridge.stageData.stage3.response : (bridge.streamStatus.inFlight ? "Synthesizing…" : "Stage 3 not ready")
+                                            wrapMode: Text.Wrap
+                                            color: "white"
+                                            font.pixelSize: 14
+                                        }
+                                        Label {
+                                            visible: bridge.stageData.title
+                                            text: bridge.stageData.title ? "Title: " + bridge.stageData.title : ""
+                                            color: muted
+                                            font.pixelSize: 12
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Input area
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 64
+                        radius: 12
+                        color: "#12151b"
+                        border.color: "#1f2933"
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 12
+                            spacing: 10
+
+                            TextArea {
+                                id: inputBox
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                placeholderText: "Ask the council anything..."
+                                color: "white"
+                                placeholderTextColor: "#6b7280"
+                                wrapMode: TextEdit.Wrap
+                                background: Rectangle {
+                                    radius: 10
+                                    color: "#0f1115"
+                                    border.color: "#1f2933"
+                                }
+                            }
+
+                            Button {
+                                text: bridge.streamStatus.inFlight ? "Stop" : "Send"
+                                icon.name: bridge.streamStatus.inFlight ? "media-playback-stop" : "arrow-up"
+                                width: 96
+                                Layout.alignment: Qt.AlignVCenter
+                                enabled: bridge.streamStatus.inFlight ? true : inputBox.text.length > 0
+                                onClicked: {
+                                    if (bridge.streamStatus.inFlight) {
+                                        bridge.cancelStream()
+                                    } else {
+                                        bridge.sendMessage(inputBox.text)
+                                        inputBox.text = ""
+                                    }
+                                }
+                                background: Rectangle {
+                                    radius: 12
+                                    color: control.down ? Qt.darker(root.accent, 1.2) : root.accent
+                                }
+                                contentItem: Label { text: control.text; color: "#0b1020"; font.bold: true }
                             }
                         }
                     }
