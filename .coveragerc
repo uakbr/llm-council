@@ -1,0 +1,10 @@
+[run]
+branch = True
+source = gui
+omit =
+    gui/app.py
+    gui/ui/*
+
+[report]
+fail_under = 90
+show_missing = True
