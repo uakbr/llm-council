@@ -23,6 +23,7 @@ class StreamStatus:
     current_stage: str | None = None
     last_event: str | None = None
     cancelled: bool = False
+    error: str | None = None
 
 
 @dataclass
@@ -43,8 +44,9 @@ class AppState:
     This avoids tight coupling to Qt; signals can be attached later.
     """
 
-    def __init__(self, backend_url: str | None = None):
+    def __init__(self, backend_url: str | None = None, api_key: str | None = None):
         self.backend_url: str = backend_url or config.DEFAULT_BACKEND_URL
+        self.api_key: str | None = api_key
         self.conversations: List[ConversationMetadata] = []
         self.current_conversation: Optional[Conversation] = None
         self.stream_status = StreamStatus()
@@ -65,6 +67,10 @@ class AppState:
         self.backend_url = url
         self._notify()
 
+    def set_api_key(self, api_key: str | None) -> None:
+        self.api_key = api_key
+        self._notify()
+
     def set_conversations(self, items: List[ConversationMetadata]) -> None:
         self.conversations = items
         self._notify()
@@ -78,7 +84,7 @@ class AppState:
         self._notify()
 
     def start_stream(self) -> None:
-        self.stream_status = StreamStatus(in_flight=True, current_stage="starting")
+        self.stream_status = StreamStatus(in_flight=True, current_stage="starting", error=None)
         self.reset_stage_payloads()
         self._notify()
 
@@ -86,18 +92,34 @@ class AppState:
         self.stream_status.in_flight = True
         self.stream_status.current_stage = event.type
         self.stream_status.last_event = event.type
+        if event.type == "error":
+            message = ""
+            if event.data and isinstance(event.data, dict):
+                message = event.data.get("message") or ""
+            self.fail_stream(message or "Streaming error")
+            return
         self._apply_stage_payload(event)
         self._notify()
 
     def end_stream(self) -> None:
         self.stream_status = StreamStatus(
-            in_flight=False, current_stage=None, last_event="complete", cancelled=False
+            in_flight=False, current_stage=None, last_event="complete", cancelled=False, error=None
         )
         self._notify()
 
     def cancel_stream(self) -> None:
         self.stream_status = StreamStatus(
-            in_flight=False, current_stage=None, last_event="cancelled", cancelled=True
+            in_flight=False, current_stage=None, last_event="cancelled", cancelled=True, error=None
+        )
+        self._notify()
+
+    def fail_stream(self, message: str) -> None:
+        self.stream_status = StreamStatus(
+            in_flight=False,
+            current_stage=None,
+            last_event="error",
+            cancelled=False,
+            error=message,
         )
         self._notify()
 

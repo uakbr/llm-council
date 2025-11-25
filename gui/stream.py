@@ -24,32 +24,46 @@ class StreamRunner:
         conversation_id: str,
         content: str,
         on_event: EventCallback | None = None,
+        *,
+        retries: int = 0,
+        backoff: float = 0.3,
     ) -> asyncio.Task:
-        """Start streaming; cancels previous stream if running."""
+        """Start streaming; cancels previous stream if running. Retries on failure."""
         await self.cancel()
         self._cancel_event = asyncio.Event()
 
         async def runner():
             self.state.start_stream()
             events: List[SSEEvent] = []
-            try:
-                async for event in self.api.stream_message(
-                    conversation_id, content, cancel_event=self._cancel_event
-                ):
-                    events.append(event)
-                    if on_event:
-                        res = on_event(event)
-                        if asyncio.iscoroutine(res):
-                            await res
-                    self.state.apply_event(event)
-                    if event.type == "complete":
-                        break
-            finally:
-                if self._cancel_event and self._cancel_event.is_set():
-                    self.state.cancel_stream()
-                else:
-                    self.state.end_stream()
-            return events
+            attempt = 0
+            while True:
+                try:
+                    async for event in self.api.stream_message(
+                        conversation_id, content, cancel_event=self._cancel_event
+                    ):
+                        events.append(event)
+                        if on_event:
+                            res = on_event(event)
+                            if asyncio.iscoroutine(res):
+                                await res
+                        self.state.apply_event(event)
+                        if event.type == "complete":
+                            break
+                    # Success path, exit retry loop
+                    if self._cancel_event and self._cancel_event.is_set():
+                        self.state.cancel_stream()
+                    else:
+                        self.state.end_stream()
+                    return events
+                except Exception as exc:
+                    attempt += 1
+                    if self._cancel_event and self._cancel_event.is_set():
+                        self.state.cancel_stream()
+                        return events
+                    if attempt > retries:
+                        self.state.fail_stream(str(exc))
+                        return events
+                    await asyncio.sleep(backoff * attempt)
 
         self._task = asyncio.create_task(runner())
         return self._task

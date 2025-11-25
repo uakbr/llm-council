@@ -15,6 +15,7 @@ ApplicationWindow {
     property color accent: "#1dc6ff"
     property color panel: "#171a20"
     property color muted: "#9ca3af"
+    property bool settingsOpen: false
 
     Component.onCompleted: bridge.loadConversations()
 
@@ -172,6 +173,22 @@ ApplicationWindow {
                     anchors.fill: parent
                     anchors.margins: 20
                     spacing: 14
+                    // Error banner
+                    Rectangle {
+                        visible: bridge.streamStatus.lastEvent === "error" && bridge.streamStatus.error !== undefined && bridge.streamStatus.error !== null && bridge.streamStatus.error !== ""
+                        Layout.fillWidth: true
+                        height: visible ? 40 : 0
+                        radius: 8
+                        color: "#2d1b1b"
+                        border.color: "#b91c1c"
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 8
+                            Label { text: "Error"; color: "#f87171"; font.bold: true; font.pixelSize: 13 }
+                            Label { text: bridge.streamStatus.error || ""; color: "#fecdd3"; font.pixelSize: 12; wrapMode: Label.Wrap; Layout.fillWidth: true }
+                        }
+                    }
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -216,6 +233,8 @@ ApplicationWindow {
                             onClicked: {
                                 if (bridge.streamStatus.inFlight) {
                                     bridge.cancelStream()
+                                } else {
+                                    settingsOpen = true
                                 }
                             }
                         }
@@ -461,6 +480,90 @@ ApplicationWindow {
                                 contentItem: Label { text: control.text; color: "#0b1020"; font.bold: true }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Settings modal
+        Popup {
+            id: settingsModal
+            x: (root.width - width) / 2
+            y: (root.height - height) / 3
+            width: 420
+            height: 280
+            modal: true
+            dim: true
+            visible: settingsOpen
+            onVisibleChanged: if (!visible) settingsOpen = false
+            background: Rectangle { color: "#0f1218"; radius: 12; border.color: "#1f2933" }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 12
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "Settings"; color: "white"; font.pixelSize: 18; font.bold: true }
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        text: "Close"
+                        flat: true
+                        onClicked: settingsOpen = false
+                        contentItem: Label { text: control.text; color: muted }
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Label { text: "Backend URL"; color: muted; font.pixelSize: 12 }
+                    TextField {
+                        id: backendField
+                        text: bridge.backendUrl
+                        color: "white"
+                        placeholderText: "http://localhost:8001"
+                        background: Rectangle { radius: 8; color: "#111620"; border.color: "#1f2933" }
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Label { text: "API Key (optional)"; color: muted; font.pixelSize: 12 }
+                    TextField {
+                        id: apiKeyField
+                        text: bridge.apiKey
+                        echoMode: TextInput.Password
+                        color: "white"
+                        placeholderText: "sk-or-..."
+                        background: Rectangle { radius: 8; color: "#111620"; border.color: "#1f2933" }
+                    }
+                }
+                Item { Layout.fillHeight: true }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    Label {
+                        id: settingsError
+                        color: "#fca5a5"
+                        text: ""
+                        font.pixelSize: 12
+                        visible: text.length > 0
+                        Layout.fillWidth: true
+                    }
+                    Button {
+                        text: "Save"
+                        onClicked: {
+                            bridge.saveSettings(backendField.text, apiKeyField.text).then(function(ok) {
+                                if (!ok) {
+                                    settingsError.text = "Backend URL required"
+                                } else {
+                                    settingsError.text = ""
+                                    settingsOpen = false
+                                }
+                            })
+                        }
+                        background: Rectangle { radius: 10; color: control.down ? Qt.darker(root.accent, 1.2) : root.accent }
+                        contentItem: Label { text: control.text; color: "#0b1020"; font.bold: true }
                     }
                 }
             }

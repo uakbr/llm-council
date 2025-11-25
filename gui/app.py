@@ -40,7 +40,7 @@ def main() -> int:
     app.aboutToQuit.connect(loop.stop)
 
     settings = load_settings()
-    state = AppState(settings.backend_url)
+    state = AppState(settings.backend_url, settings.api_key)
     api = CouncilAPI(base_url=state.backend_url, api_key=settings.api_key)
     controller = GUIController(api, state)
     stream_runner = StreamRunner(api, state)

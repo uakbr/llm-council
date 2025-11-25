@@ -22,8 +22,10 @@
 
 ## Desktop GUI (PySide6 / QML)
 - Entrypoint: `gui/app.py` (Qt + qasync loop; loads `gui/ui/Main.qml`).
-- Data layer: `gui/api.py` (REST + SSE client), `gui/models.py` (typed DTOs), `gui/state.py` (state store), `gui/controller.py` (orchestration), `gui/persistence.py` (settings).
-- UI: `gui/ui/Main.qml` (design shell; to be wired to controller/state).
+- Data layer: `gui/api.py` (REST + SSE client, runtime-configurable URL/API key), `gui/models.py` (typed DTOs), `gui/state.py` (AppState + StreamStatus + StagePayloads), `gui/controller.py` (orchestration), `gui/persistence.py` (settings).
+- Streaming runner: `gui/stream.py` (cancel + retry/backoff; forwards SSE events to state).
+- Qt bridge: `gui/bridge.py` (QObject exposing conversations, stage data, send/cancel, saveSettings to QML).
+- UI: `gui/ui/Main.qml` (bound to bridge/state; stage sections, aggregate ranking bars, error banner, settings modal).
 
 ## Data & Storage
 - Conversations: JSON files in `data/conversations/` (gitignored).
@@ -37,7 +39,7 @@
 ## Error Handling & Resilience
 - Stage queries tolerate individual model failures; proceed with successes.
 - Ranking parser falls back to any “Response X” order if strict format fails.
-- SSE streaming endpoint emits stage start/complete + title + complete/error events.
+- SSE streaming endpoint emits stage start/complete + title + complete/error events; GUI stream runner retries transient errors and surfaces failures to an error banner.
 
 ## Future Considerations
 - Token-level streaming per model (currently stage-level).

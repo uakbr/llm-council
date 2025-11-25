@@ -61,6 +61,24 @@ def test_stage_payloads_update_and_title_propagation():
     assert state.stage_payloads.title == "New Title"
     assert state.current_conversation.title == "New Title"
     assert state.conversations[0].title == "New Title"
+    state.fail_stream("boom")
+    assert state.stream_status.error == "boom"
+    assert state.stream_status.last_event == "error"
+
+
+def test_backend_url_and_reset_state_on_none_conversation():
+    state = AppState()
+    state.set_backend_url("http://example.com")
+    assert state.backend_url == "http://example.com"
+    state.set_api_key("token")
+    assert state.api_key == "token"
+
+    state.set_current_conversation(None)
+    assert state.stage_payloads.title is None
+
+    state.apply_event(SSEEvent(type="error", data={"message": "oops"}))
+    assert state.stream_status.error == "oops"
+    assert state.stream_status.last_event == "error"
 
 
 def test_stage_payloads_hydrate_from_conversation():

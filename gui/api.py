@@ -30,6 +30,14 @@ class CouncilAPI:
         self._owns_client = client is None
         timeout = httpx.Timeout(connect=10.0, read=320.0, write=30.0, pool=10.0)
         self._client = client or httpx.AsyncClient(timeout=timeout)
+        self._timeout = timeout
+
+    def update_config(self, *, base_url: str | None = None, api_key: str | None = None) -> None:
+        """Update base URL/API key without recreating the client."""
+        if base_url:
+            self.base_url = base_url.rstrip("/")
+        if api_key is not None:
+            self.api_key = api_key
 
     # Lifecycle ----------------------------------------------------------
     async def aclose(self) -> None:

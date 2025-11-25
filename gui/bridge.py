@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Property, Signal
 from qasync import asyncSlot
 
 from .controller import GUIController
+from .persistence import Settings, save_settings
 from .state import AppState, StagePayloads, StreamStatus
 from .stream import StreamRunner
 from .models import AssistantMessage, Conversation, ConversationMetadata, UserMessage
@@ -51,6 +52,7 @@ def _stream_status_to_dict(status: StreamStatus) -> Dict[str, Any]:
         "currentStage": status.current_stage,
         "lastEvent": status.last_event,
         "cancelled": status.cancelled,
+        "error": status.error,
     }
 
 
@@ -73,6 +75,7 @@ class QmlBridge(QObject):
     streamStatusChanged = Signal()
     stageDataChanged = Signal()
     backendUrlChanged = Signal()
+    apiKeyChanged = Signal()
     busyChanged = Signal()
     errorOccurred = Signal(str)
 
@@ -82,6 +85,7 @@ class QmlBridge(QObject):
         self.stream_runner = stream_runner
         self.state = state
         self._busy = False
+        self._last_error_sent: str | None = None
         self.state.subscribe(self._on_state_change)
 
     # Property helpers --------------------------------------------------
@@ -91,6 +95,10 @@ class QmlBridge(QObject):
         self.streamStatusChanged.emit()
         self.stageDataChanged.emit()
         self.backendUrlChanged.emit()
+        self.apiKeyChanged.emit()
+        if self.state.stream_status.error and self.state.stream_status.error != self._last_error_sent:
+            self._last_error_sent = self.state.stream_status.error
+            self.errorOccurred.emit(self.state.stream_status.error)
 
     def _get_conversations(self) -> List[Dict[str, Any]]:
         current_id = self.state.current_conversation.id if self.state.current_conversation else None
@@ -121,6 +129,11 @@ class QmlBridge(QObject):
         return self.state.backend_url
 
     backendUrl = Property(str, fget=_get_backend_url, notify=backendUrlChanged)
+
+    def _get_api_key(self) -> str:
+        return self.state.api_key or ""
+
+    apiKey = Property(str, fget=_get_api_key, notify=apiKeyChanged)
 
     def _get_busy(self) -> bool:
         return self._busy
@@ -190,6 +203,20 @@ class QmlBridge(QObject):
     @asyncSlot(result=bool)
     async def cancelStream(self) -> bool:
         await self._wrap_errors(self.stream_runner.cancel())
+        return True
+
+    @asyncSlot(str, str, result=bool)
+    async def saveSettings(self, backend_url: str, api_key: str) -> bool:
+        backend_url = backend_url.strip() if backend_url else ""
+        api_key = api_key.strip() if api_key else None
+        if not backend_url:
+            self.errorOccurred.emit("Backend URL is required")
+            return False
+        self.state.set_backend_url(backend_url)
+        self.state.set_api_key(api_key)
+        self.controller.api.update_config(base_url=backend_url, api_key=api_key)
+        self.stream_runner.api.update_config(base_url=backend_url, api_key=api_key)
+        save_settings(Settings(backend_url=backend_url, api_key=api_key or None))
         return True
 
     # Utilities ---------------------------------------------------------
