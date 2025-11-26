@@ -1,38 +1,34 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import Stage2 from './Stage2';
 
+const rankings = [
+  {
+    model: 'openai/gpt-5.1',
+    ranking: 'Response A is better than Response B',
+    parsed_ranking: ['Response A', 'Response B'],
+  },
+  {
+    model: 'google/gemini-3-pro-preview',
+    ranking: 'Response B wins',
+    parsed_ranking: ['Response B'],
+  },
+];
+
+const labelToModel = {
+  'Response A': 'openai/gpt-5.1',
+  'Response B': 'google/gemini-3-pro-preview',
+};
+
 describe('Stage2', () => {
-  it('shows parsed and aggregate rankings with model names', () => {
-    const rankings = [
-      {
-        model: 'openai/gpt',
-        ranking: 'FINAL RANKING:\n1. Response A',
-        parsed_ranking: ['Response A'],
-      },
-    ];
-    const labelToModel = { 'Response A': 'openai/gpt' };
-    const aggregateRankings = [
-      { model: 'openai/gpt', average_rank: 1.0, rankings_count: 1 },
-    ];
-
-    render(
-      <Stage2
-        rankings={rankings}
-        labelToModel={labelToModel}
-        aggregateRankings={aggregateRankings}
-      />
-    );
-
-    expect(screen.getByText('Stage 2: Peer Rankings')).toBeInTheDocument();
-    expect(screen.getByText(/Aggregate Rankings/)).toBeInTheDocument();
-    expect(screen.getByText('#1')).toBeInTheDocument();
-    expect(screen.getAllByText('gpt').length).toBeGreaterThan(0);
+  it('renders tablist and panels with rankings', () => {
+    render(<Stage2 rankings={rankings} labelToModel={labelToModel} aggregateRankings={[]} />);
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('gpt-5.1');
   });
 
-  it('returns null when rankings missing', () => {
-    const { container } = render(
-      <Stage2 rankings={[]} labelToModel={{}} aggregateRankings={[]} />
-    );
-    expect(container.innerHTML).toBe('');
+  it('switches tabs and shows corresponding content', () => {
+    render(<Stage2 rankings={rankings} labelToModel={labelToModel} aggregateRankings={[]} />);
+    fireEvent.click(screen.getAllByRole('tab')[1]);
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('wins');
   });
 });

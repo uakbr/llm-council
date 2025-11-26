@@ -99,10 +99,27 @@ describe('Settings', () => {
     expect(await screen.findByText('API key saved.')).toBeInTheDocument();
   });
 
-  it('shows load error message', async () => {
+  it('shows load error message and falls back to defaults', async () => {
     api.getSettings.mockRejectedValue(new Error('load failed'));
     render(<Settings onClose={() => {}} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('load failed');
+    expect(await screen.findByTestId('base-url-value')).toHaveTextContent('https://openrouter.ai/api/v1/chat/completions');
+    expect(screen.getByText('openai/gpt-5.1')).toBeInTheDocument();
+  });
+
+  it('clears alerts when user edits key', async () => {
+    api.getSettings.mockResolvedValue({
+      openrouter_api_key: null,
+      openrouter_api_url: 'https://example.com',
+      council_models: ['m1'],
+      chairman_model: 'boss',
+    });
+    render(<Settings onClose={() => {}} />);
+    await screen.findByTestId('base-url-value');
+    fireEvent.click(screen.getByRole('button', { name: /save api key/i }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('OpenRouter API Key'), 'abc');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('shows test connection failure', async () => {
@@ -117,5 +134,11 @@ describe('Settings', () => {
     await screen.findByTestId('base-url-value');
     fireEvent.click(screen.getByRole('button', { name: /test connection/i }));
     expect(await screen.findByTestId('test-failure')).toHaveTextContent('bad key');
+  });
+
+  it('renders skeleton while loading', () => {
+    api.getSettings.mockReturnValue(new Promise(() => {})); // keep pending to stay in loading state
+    const { container } = render(<Settings onClose={() => {}} />);
+    expect(container.querySelector('.skeleton-block')).toBeInTheDocument();
   });
 });

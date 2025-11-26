@@ -197,6 +197,7 @@ function App() {
         return { ...prev, messages: prev.messages.slice(0, -2) };
       });
       setIsLoading(false);
+      throw error;
     }
   };
 

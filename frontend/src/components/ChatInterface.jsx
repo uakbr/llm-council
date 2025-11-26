@@ -11,6 +11,7 @@ export default function ChatInterface({
   isLoading,
 }) {
   const [input, setInput] = useState('');
+  const [sendError, setSendError] = useState('');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -24,11 +25,15 @@ export default function ChatInterface({
     scrollToBottom();
   }, [conversation]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (input.trim() && !isLoading) {
-      onSendMessage(input);
+    if (!input.trim() || isLoading) return;
+    try {
+      await onSendMessage(input);
       setInput('');
+      setSendError('');
+    } catch (err) {
+      setSendError(err?.message || 'Failed to send message');
     }
   };
 
@@ -40,24 +45,13 @@ export default function ChatInterface({
     }
   };
 
-  if (!conversation) {
-    return (
-      <div className="chat-interface">
-        <div className="empty-state">
-          <h2>Welcome to LLM Council</h2>
-          <p>Create a new conversation to get started</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="chat-interface">
-      <div className="messages-container">
-        {conversation.messages.length === 0 ? (
+  const content = (
+    <div className="messages-container">
+      <div className="messages-inner">
+        {!conversation || conversation.messages.length === 0 ? (
           <div className="empty-state">
-            <h2>Start a conversation</h2>
-            <p>Ask a question to consult the LLM Council</p>
+            <h2>{conversation ? 'Start a conversation' : 'Welcome to LLM Council'}</h2>
+            <p>{conversation ? 'Ask a question to consult the LLM Council' : 'Create a new conversation to get started'}</p>
           </div>
         ) : (
           conversation.messages.map((msg, index) => (
@@ -122,24 +116,37 @@ export default function ChatInterface({
 
         <div ref={messagesEndRef} />
       </div>
+    </div>
+  );
+
+  return (
+    <div className="chat-interface">
+      {content}
 
       <form className="input-form" onSubmit={handleSubmit}>
-        <textarea
-          className="message-input"
-          placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          rows={3}
-        />
-        <button
-          type="submit"
-          className="send-button"
-          disabled={!input.trim() || isLoading}
-        >
-          Send
-        </button>
+        <div className="input-inner">
+          <textarea
+            className="message-input"
+            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            rows={3}
+          />
+          <button
+            type="submit"
+            className="send-button"
+            disabled={!input.trim() || isLoading}
+          >
+            Send
+          </button>
+        </div>
+        {sendError && (
+          <div className="send-error" role="alert" aria-live="polite">
+            {sendError}
+          </div>
+        )}
       </form>
     </div>
   );

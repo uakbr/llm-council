@@ -1,16 +1,17 @@
 .stage {
   margin: 24px 0;
   padding: 20px;
-  background: #fafafa;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e1e6ef;
+  box-shadow: 0 10px 28px rgba(17, 38, 78, 0.06);
 }
 
 .stage-title {
-  margin: 0 0 16px 0;
-  color: #333;
+  margin: 0 0 12px 0;
+  color: #1f2a3d;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .tabs {
@@ -18,6 +19,8 @@
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .tab {
