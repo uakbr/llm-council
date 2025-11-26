@@ -2,7 +2,8 @@
 
 import httpx
 from typing import List, Dict, Any, Optional
-from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
+
+from .settings import get_openrouter_credentials
 
 
 async def query_model(
@@ -22,8 +23,9 @@ async def query_model(
     Returns:
         Response dict with 'content' and optional 'reasoning_details', or None if failed
     """
+    creds = get_openrouter_credentials()
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {creds.api_key}" if creds.api_key else "",
         "Content-Type": "application/json",
     }
 
@@ -35,7 +37,7 @@ async def query_model(
     try:
         async def _do_request(client_obj: httpx.AsyncClient):
             response = await client_obj.post(
-                OPENROUTER_API_URL,
+                creds.api_url,
                 headers=headers,
                 json=payload
             )

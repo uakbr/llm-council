@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { vi } from 'vitest';
 import Sidebar from './Sidebar';
 
 describe('Sidebar', () => {
@@ -32,5 +33,36 @@ describe('Sidebar', () => {
     );
 
     expect(screen.getByText('No conversations yet')).toBeInTheDocument();
+  });
+
+  it('calls onOpenSettings when Settings is clicked', () => {
+    const spy = vi.fn();
+    render(
+      <Sidebar
+        conversations={[]}
+        currentConversationId={null}
+        onSelectConversation={() => {}}
+        onNewConversation={() => {}}
+        onOpenSettings={spy}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Settings'));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks settings button active when open', () => {
+    render(
+      <Sidebar
+        conversations={[]}
+        currentConversationId={null}
+        onSelectConversation={() => {}}
+        onNewConversation={() => {}}
+        onOpenSettings={() => {}}
+        isSettingsOpen
+      />
+    );
+
+    expect(screen.getByText('Settings').className).toContain('active');
   });
 });

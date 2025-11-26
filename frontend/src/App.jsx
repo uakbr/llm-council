@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import Settings from './components/Settings';
 import { api } from './api';
 import './App.css';
 
@@ -35,6 +36,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeView, setActiveView] = useState('chat'); // 'chat' | 'settings'
 
   // Load conversations on mount
   useEffect(() => {
@@ -74,6 +76,7 @@ function App() {
         ...conversations,
       ]);
       setCurrentConversationId(newConv.id);
+      setActiveView('chat');
     } catch (error) {
       console.error('Failed to create conversation:', error);
     }
@@ -81,6 +84,7 @@ function App() {
 
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+    setActiveView('chat');
   };
 
   const handleSendMessage = async (content) => {
@@ -203,12 +207,18 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onOpenSettings={() => setActiveView('settings')}
+        isSettingsOpen={activeView === 'settings'}
       />
-      <ChatInterface
-        conversation={currentConversation}
-        onSendMessage={handleSendMessage}
-        isLoading={isLoading}
-      />
+      {activeView === 'settings' ? (
+        <Settings onClose={() => setActiveView('chat')} />
+      ) : (
+        <ChatInterface
+          conversation={currentConversation}
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   );
 }

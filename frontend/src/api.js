@@ -112,4 +112,47 @@ export const api = {
       }
     }
   },
+
+  /**
+   * Fetch saved settings (API key is redacted).
+   */
+  async getSettings() {
+    const response = await fetch(`${API_BASE}/api/settings`);
+    if (!response.ok) {
+      throw new Error('Failed to load settings');
+    }
+    return response.json();
+  },
+
+  /**
+   * Update settings. Leave `openrouter_api_key` undefined to keep existing.
+   */
+  async updateSettings(payload) {
+    const response = await fetch(`${API_BASE}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to save settings');
+    }
+    return response.json();
+  },
+
+  /**
+   * Test OpenRouter connectivity with provided or saved settings.
+   */
+  async testSettings(payload) {
+    const response = await fetch(`${API_BASE}/api/settings/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      const message = detail.detail || 'Connection test failed';
+      throw new Error(message);
+    }
+    return response.json();
+  },
 };

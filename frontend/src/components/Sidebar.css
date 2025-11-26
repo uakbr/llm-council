@@ -18,6 +18,30 @@
   color: #333;
 }
 
+.sidebar-actions {
+  padding: 0 16px 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.settings-btn {
+  width: 100%;
+  padding: 9px;
+  background: #ffffff;
+  border: 1px solid #d0d7e2;
+  border-radius: 6px;
+  color: #2d3748;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.settings-btn.active,
+.settings-btn:hover {
+  background: #e8f0fe;
+  border-color: #4a90e2;
+  color: #1a365d;
+}
+
 .new-conversation-btn {
   width: 100%;
   padding: 10px;

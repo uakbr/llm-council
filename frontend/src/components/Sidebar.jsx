@@ -6,6 +6,8 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onOpenSettings = () => {},
+  isSettingsOpen = false,
 }) {
   return (
     <div className="sidebar">
@@ -13,6 +15,16 @@ export default function Sidebar({
         <h1>LLM Council</h1>
         <button className="new-conversation-btn" onClick={onNewConversation}>
           + New Conversation
+        </button>
+      </div>
+
+      <div className="sidebar-actions">
+        <button
+          className={`settings-btn ${isSettingsOpen ? 'active' : ''}`}
+          onClick={onOpenSettings}
+          type="button"
+        >
+          Settings
         </button>
       </div>
 

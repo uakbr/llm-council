@@ -4,12 +4,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
 
 from . import storage
+from . import settings
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 
 app = FastAPI(title="LLM Council API")
@@ -50,10 +51,55 @@ class Conversation(BaseModel):
     messages: List[Dict[str, Any]]
 
 
+class SettingsResponse(BaseModel):
+    """User-configurable settings (API key is redacted)."""
+    openrouter_api_key: Optional[str]
+    openrouter_api_url: str
+    council_models: List[str]
+    chairman_model: str
+
+
+class UpdateSettingsRequest(BaseModel):
+    """Settings update payload (partial allowed)."""
+    openrouter_api_key: Optional[str] = None
+    openrouter_api_url: Optional[str] = None
+    council_models: Optional[List[str]] = None
+    chairman_model: Optional[str] = None
+
+
+class TestSettingsRequest(BaseModel):
+    """Payload for testing OpenRouter connectivity."""
+    openrouter_api_key: Optional[str] = None
+    openrouter_api_url: Optional[str] = None
+
+
 @app.get("/")
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/api/settings", response_model=SettingsResponse)
+async def get_settings():
+    """Return saved settings with API key redacted."""
+    return settings.load_settings(redact=True)
+
+
+@app.post("/api/settings", response_model=SettingsResponse)
+async def update_settings(request: UpdateSettingsRequest):
+    """Persist settings and return the redacted view."""
+    updated = settings.update_settings(request.model_dump(exclude_none=True))
+    return settings.load_settings(redact=True)
+
+
+@app.post("/api/settings/test")
+async def test_settings(request: TestSettingsRequest):
+    """Test OpenRouter connectivity with provided or saved credentials."""
+    creds = settings.get_openrouter_credentials(request.model_dump(exclude_none=True))
+    result = await settings.test_openrouter_connection(creds)
+    if not result["ok"]:
+        raise HTTPException(status_code=400, detail=result.get("error", "Connection failed"))
+    return {"ok": True, "model_count": result.get("model_count", 0)}
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
@@ -89,6 +135,10 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    effective_settings = settings.get_effective_settings()
+    if not effective_settings.openrouter_api_key:
+        raise HTTPException(status_code=400, detail="OpenRouter API key is not configured. Add it in Settings.")
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
@@ -134,6 +184,10 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    effective_settings = settings.get_effective_settings()
+    if not effective_settings.openrouter_api_key:
+        raise HTTPException(status_code=400, detail="OpenRouter API key is not configured. Add it in Settings.")
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
