@@ -17,7 +17,7 @@ describe('Settings', () => {
     vi.clearAllMocks();
   });
 
-  it('shows loaded values and keeps key input empty', async () => {
+  it('shows preset values and keeps key input empty', async () => {
     api.getSettings.mockResolvedValue({
       openrouter_api_key: '****1234',
       openrouter_api_url: 'https://example.com',
@@ -30,24 +30,25 @@ describe('Settings', () => {
 
     await screen.findByTestId('settings-panel');
     expect(screen.getByLabelText('OpenRouter API Key').value).toBe('');
-    expect(screen.getByLabelText('OpenRouter Base URL').value).toBe('https://example.com');
-    expect(screen.getByLabelText('Chairman Model').value).toBe('boss');
+    expect(screen.getByTestId('base-url-value')).toHaveTextContent('https://example.com');
+    expect(screen.getByText('m1')).toBeInTheDocument();
+    expect(screen.getByText('boss')).toBeInTheDocument();
   });
 
-  it('validates models before saving', async () => {
+  it('requires an API key before saving', async () => {
     api.getSettings.mockResolvedValue({
       openrouter_api_key: null,
       openrouter_api_url: 'https://example.com',
-      council_models: [],
+      council_models: ['m1'],
       chairman_model: 'boss',
     });
 
     render(<Settings onClose={() => {}} />);
 
-    await screen.findByDisplayValue('https://example.com');
-    fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
+    await screen.findByTestId('base-url-value');
+    fireEvent.click(screen.getByRole('button', { name: /save api key/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Add at least one council model');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter your OpenRouter API key');
     expect(api.updateSettings).not.toHaveBeenCalled();
   });
 
@@ -64,12 +65,12 @@ describe('Settings', () => {
 
     await screen.findByText('Settings');
     await userEvent.type(screen.getByLabelText('OpenRouter API Key'), 'sk-test');
-    fireEvent.click(screen.getByText('Test Connection'));
+    fireEvent.click(screen.getByRole('button', { name: /test connection/i }));
 
     await waitFor(() => {
       expect(api.testSettings).toHaveBeenCalledWith({
-        openrouter_api_key: 'sk-test',
         openrouter_api_url: 'https://example.com',
+        openrouter_api_key: 'sk-test',
       });
     });
     expect(await screen.findByTestId('test-success')).toBeInTheDocument();
@@ -86,24 +87,16 @@ describe('Settings', () => {
 
     render(<Settings onClose={() => {}} />);
 
-    await screen.findByDisplayValue('https://example.com');
+    await screen.findByTestId('base-url-value');
     await userEvent.type(screen.getByLabelText('OpenRouter API Key'), 'sk-newkey');
-    await userEvent.type(screen.getByLabelText('Council Models (one per line)'), '\nmodel-b');
-    await userEvent.clear(screen.getByLabelText('Chairman Model'));
-    await userEvent.type(screen.getByLabelText('Chairman Model'), 'boss');
 
-    fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save api key/i }));
 
     await waitFor(() => {
-      expect(api.updateSettings).toHaveBeenCalledWith({
-        openrouter_api_key: 'sk-newkey',
-        openrouter_api_url: 'https://example.com',
-        council_models: ['model-a', 'model-b'],
-        chairman_model: 'boss',
-      });
+      expect(api.updateSettings).toHaveBeenCalledWith({ openrouter_api_key: 'sk-newkey' });
     });
     expect(screen.getByLabelText('OpenRouter API Key').value).toBe('');
-    expect(await screen.findByText('Settings saved.')).toBeInTheDocument();
+    expect(await screen.findByText('API key saved.')).toBeInTheDocument();
   });
 
   it('shows load error message', async () => {
@@ -121,8 +114,8 @@ describe('Settings', () => {
     });
     api.testSettings.mockRejectedValue(new Error('bad key'));
     render(<Settings onClose={() => {}} />);
-    await screen.findByDisplayValue('https://example.com');
-    fireEvent.click(screen.getAllByText('Test Connection')[0]);
+    await screen.findByTestId('base-url-value');
+    fireEvent.click(screen.getByRole('button', { name: /test connection/i }));
     expect(await screen.findByTestId('test-failure')).toHaveTextContent('bad key');
   });
 });

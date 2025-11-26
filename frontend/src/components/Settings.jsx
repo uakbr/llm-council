@@ -2,13 +2,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import './Settings.css';
 
-function parseModels(text) {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 export default function Settings({ onClose }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -17,10 +10,10 @@ export default function Settings({ onClose }) {
   const [success, setSuccess] = useState('');
   const [testResult, setTestResult] = useState(null);
   const [maskedKey, setMaskedKey] = useState('');
-  const [form, setForm] = useState({
-    openrouter_api_key: '',
+  const [form, setForm] = useState({ openrouter_api_key: '' });
+  const [presets, setPresets] = useState({
     openrouter_api_url: '',
-    council_models_text: '',
+    council_models: [],
     chairman_model: '',
   });
 
@@ -29,10 +22,9 @@ export default function Settings({ onClose }) {
       try {
         const data = await api.getSettings();
         setMaskedKey(data.openrouter_api_key || '');
-        setForm({
-          openrouter_api_key: '',
-          openrouter_api_url: data.openrouter_api_url || '',
-          council_models_text: (data.council_models || []).join('\n'),
+        setPresets({
+          openrouter_api_url: data.openrouter_api_url || 'https://openrouter.ai/api/v1/chat/completions',
+          council_models: data.council_models || [],
           chairman_model: data.chairman_model || '',
         });
       } catch (e) {
@@ -53,30 +45,20 @@ export default function Settings({ onClose }) {
     setSaving(true);
     setSuccess('');
     setError('');
+    setTestResult(null);
 
-    const councilModels = parseModels(form.council_models_text);
-    if (councilModels.length === 0) {
+    const key = form.openrouter_api_key.trim();
+    if (!key) {
       setSaving(false);
-      setError('Add at least one council model.');
+      setError('Enter your OpenRouter API key');
       return;
     }
 
-    const payload = {
-      openrouter_api_url: form.openrouter_api_url.trim(),
-      council_models: councilModels,
-      chairman_model: form.chairman_model.trim(),
-    };
-
-    if (form.openrouter_api_key.trim() !== '') {
-      payload.openrouter_api_key = form.openrouter_api_key.trim();
-    }
-
     try {
-      const saved = await api.updateSettings(payload);
-      setSuccess('Settings saved.');
+      const saved = await api.updateSettings({ openrouter_api_key: key });
+      setSuccess('API key saved.');
       setMaskedKey(saved.openrouter_api_key || maskedKey);
-      // Clear the key field after save so we don't resend redacted text
-      setForm((prev) => ({ ...prev, openrouter_api_key: '' }));
+      setForm({ openrouter_api_key: '' });
     } catch (e) {
       setError(e.message || 'Failed to save settings');
     } finally {
@@ -90,12 +72,12 @@ export default function Settings({ onClose }) {
     setSuccess('');
     setTestResult(null);
 
-    const payload = {};
+    const payload = {
+      openrouter_api_url: presets.openrouter_api_url,
+    };
+
     if (form.openrouter_api_key.trim()) {
       payload.openrouter_api_key = form.openrouter_api_key.trim();
-    }
-    if (form.openrouter_api_url.trim()) {
-      payload.openrouter_api_url = form.openrouter_api_url.trim();
     }
 
     try {
@@ -127,13 +109,10 @@ export default function Settings({ onClose }) {
         <div>
           <h2>Settings</h2>
           <p className="settings-subtitle">
-            Configure your OpenRouter credentials and model preferences. Keys are stored locally.
+            Just drop in your OpenRouter API key. We&apos;ll use our recommended endpoint and default model roster.
           </p>
         </div>
         <div className="settings-actions">
-          <button className="secondary-btn" onClick={handleTest} disabled={testing}>
-            {testing ? 'Testing…' : 'Test Connection'}
-          </button>
           <button className="secondary-btn" onClick={onClose}>
             Back to Chat
           </button>
@@ -151,48 +130,47 @@ export default function Settings({ onClose }) {
             type="password"
             value={form.openrouter_api_key}
             onChange={handleChange('openrouter_api_key')}
-            placeholder={maskedKey ? `Saved (${maskedKey})` : 'sk-or-v1-...'}
+            placeholder={maskedKey ? 'Saved key on file' : 'sk-or-v1-...'}
             autoComplete="off"
           />
-          <div className="field-hint">Leave blank to keep the existing key.</div>
+          <div className="field-hint">
+            Stored only on this device. You can create or view keys on your OpenRouter dashboard.
+          </div>
         </div>
 
-        <div className="field">
-          <label htmlFor="openrouter_api_url">OpenRouter Base URL</label>
-          <input
-            id="openrouter_api_url"
-            type="text"
-            value={form.openrouter_api_url}
-            onChange={handleChange('openrouter_api_url')}
-            placeholder="https://openrouter.ai/api/v1/chat/completions"
-            required
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="council_models">Council Models (one per line)</label>
-          <textarea
-            id="council_models"
-            value={form.council_models_text}
-            onChange={handleChange('council_models_text')}
-            rows={5}
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="chairman_model">Chairman Model</label>
-          <input
-            id="chairman_model"
-            type="text"
-            value={form.chairman_model}
-            onChange={handleChange('chairman_model')}
-            required
-          />
+        <div className="preset-panel" aria-label="Preset OpenRouter settings">
+          <div className="preset-header">Everything else is preconfigured</div>
+          <div className="preset-grid">
+            <div className="preset-item">
+              <div className="preset-label">Endpoint</div>
+              <code className="preset-value" data-testid="base-url-value">
+                {presets.openrouter_api_url}
+              </code>
+              <div className="preset-hint">From OpenRouter docs (chat completions).</div>
+            </div>
+            <div className="preset-item">
+              <div className="preset-label">Council models</div>
+              <div className="chip-row">
+                {presets.council_models.map((model) => (
+                  <span className="chip" key={model}>
+                    {model}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="preset-item">
+              <div className="preset-label">Chair model</div>
+              <span className="chip chip-primary">{presets.chairman_model}</span>
+            </div>
+          </div>
         </div>
 
         <div className="settings-actions">
           <button type="submit" className="primary-btn" disabled={saving}>
-            {saving ? 'Saving…' : 'Save Settings'}
+            {saving ? 'Saving…' : 'Save API Key'}
+          </button>
+          <button type="button" className="secondary-btn" onClick={handleTest} disabled={testing}>
+            {testing ? 'Testing…' : 'Test Connection'}
           </button>
         </div>
       </form>

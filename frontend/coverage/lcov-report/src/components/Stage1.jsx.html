@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>5/6</span>
+                <span class='fraction'>0/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">75% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>6/8</span>
+                <span class='fraction'>0/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>0/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>5/6</span>
+                <span class='fraction'>0/6</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -104,19 +104,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -139,25 +139,25 @@
 import ReactMarkdown from 'react-markdown';
 import './Stage1.css';
 &nbsp;
-export default function Stage1({ responses }) {
-  const [activeTab, setActiveTab] = useState(0);
+export default function <span class="fstat-no" title="function not covered" >Stage1({</span> responses }) {
+  const [activeTab, setActiveTab] = <span class="cstat-no" title="statement not covered" >useState(0);</span>
 &nbsp;
-  if (!responses || responses.length === 0) {
-    return null;
+<span class="cstat-no" title="statement not covered" >  if (!responses || responses.length === 0) {</span>
+<span class="cstat-no" title="statement not covered" >    return null;</span>
   }
 &nbsp;
-  return (
+<span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;div className="stage stage1"&gt;
       &lt;h3 className="stage-title"&gt;Stage 1: Individual Responses&lt;/h3&gt;
 &nbsp;
       &lt;div className="tabs"&gt;
-        {responses.map((resp, index) =&gt; (
-          &lt;button
+        {responses.map(<span class="fstat-no" title="function not covered" >(r</span>esp, index) =&gt; (
+<span class="cstat-no" title="statement not covered" >          &lt;button</span>
             key={index}
-            className={`tab ${activeTab === index ? 'active' : <span class="branch-1 cbranch-no" title="branch not covered" >''}</span>`}
+            className={`tab ${activeTab === index ? 'active' : ''}`}
             onClick={<span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etActiveTab(index)}</span>
           &gt;
-            {resp.model.split('/')[1] || <span class="branch-1 cbranch-no" title="branch not covered" >resp.model}</span>
+            {resp.model.split('/')[1] || resp.model}
           &lt;/button&gt;
         ))}
       &lt;/div&gt;
@@ -178,7 +178,7 @@ export default function Stage1({ responses }) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-25T17:38:58.736Z
+                at 2025-11-26T16:49:00.548Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
